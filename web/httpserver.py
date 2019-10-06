@@ -1,6 +1,7 @@
 import os
 import posixpath
 import sys
+import re
 
 from . import utils
 from . import webapi as web
@@ -229,9 +230,9 @@ class StaticApp(SimpleHTTPRequestHandler):
         try:
             path = self.translate_path(self.path)
             etag = '"%s"' % os.path.getmtime(path)
-            client_etag = environ.get("HTTP_IF_NONE_MATCH")
+            client_etags = self._parse_etags(environ.get("HTTP_IF_NONE_MATCH"))
             self.send_header("ETag", etag)
-            if etag == client_etag:
+            if etag in client_etags:
                 self.send_response(304, "Not Modified")
                 self.start_response(self.status, self.headers)
                 return
@@ -252,6 +253,12 @@ class StaticApp(SimpleHTTPRequestHandler):
         else:
             value = self.wfile.getvalue()
             yield value
+
+    def _parse_etags(self, if_none_match_header):
+        if if_none_match_header is None:
+            return []
+        else:
+            return re.findall(r'(?:W\/)?("[^"]*")', if_none_match_header)
 
 
 class StaticMiddleware:
